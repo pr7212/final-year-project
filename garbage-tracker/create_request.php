@@ -40,58 +40,58 @@ function respond($success, $message, $data = null, $code = 200, $redirect = null
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-  respond(false, 'Method not allowed', null, 405, '../resident.php?error=method_not_allowed');
+  respond(false, 'Method not allowed', null, 405, '../dashboard.php?error=method_not_allowed');
 }
 
 if (empty($_SESSION['user_id'])) {
   respond(false, 'Unauthorized', null, 401, '../index.php');
 }
 
-$role = $_SESSION['role'] ?? 'resident';
-
 if (
   empty($_SESSION['csrf_token']) ||
   empty($_POST['csrf_token']) ||
   !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])
 ) {
-  respond(false, 'Invalid CSRF token', null, 403, '../resident.php?error=invalid_csrf');
+  respond(false, 'Invalid CSRF token', null, 403, '../dashboard.php?error=invalid_csrf');
 }
 
-$request_id = (int)($_POST['request_id'] ?? 0);
-$area_id = (int)($_POST['area_id'] ?? 0);
-$status = $_POST['status'] ?? '';
+$area = trim($_POST['area'] ?? '');
 
-if ($request_id <= 0 || $area_id <= 0 || empty($status)) {
-  respond(false, 'Invalid input', null, 400, '../resident.php?error=invalid_input');
+if ($area === '') {
+  respond(false, 'Area is required', null, 400, '../dashboard.php?error=missing_area');
+}
+
+if (strlen($area) < 3) {
+  respond(false, 'Area must be at least 3 characters long', null, 400, '../dashboard.php?error=area_too_short');
+}
+
+if (strlen($area) > 255) {
+  respond(false, 'Area must be 255 characters or fewer', null, 400, '../dashboard.php?error=area_too_long');
 }
 
 $user_id = (int) $_SESSION['user_id'];
+$status = 'pending';
 
-$sql = "
-  UPDATE requests
-  SET area_id = ?, status = ?, updated_at = CURRENT_TIMESTAMP
-  WHERE id = ? AND (user_id = ? OR ? IN ('admin', 'officer'))
-";
-$stmt = $conn->prepare($sql);
+$stmt = $conn->prepare('INSERT INTO requests (user_id, area, status) VALUES (?, ?, ?)');
 if (!$stmt) {
-  respond(false, 'Database error', null, 500, '../resident.php?error=db_error');
+  respond(false, 'Database error', null, 500, '../dashboard.php?error=db_error');
 }
 
-$admin_officer = ($role === 'admin' || $role === 'officer') ? 1 : 0;
-$stmt->bind_param('isis i', $area_id, $status, $request_id, $user_id, $admin_officer);
+$stmt->bind_param('iss', $user_id, $area, $status);
 
 if (!$stmt->execute()) {
   $stmt->close();
   $conn->close();
-  respond(false, 'Update failed', null, 500, '../resident.php?error=update_failed');
+  respond(false, 'Insert failed', null, 500, '../dashboard.php?error=insert_failed');
 }
 
-$affected = $stmt->affected_rows;
+$newId = $stmt->insert_id;
+
 $stmt->close();
 $conn->close();
 
-if ($affected === 0) {
-  respond(false, 'Request not found or unauthorized', null, 403);
-}
-
-respond(true, 'Request updated successfully', ['affected_rows' => $affected]);
+respond(true, 'Request created successfully', [
+  'id' => $newId,
+  'area' => $area,
+  'status' => $status
+], 201, '../dashboard.php?success=request_submitted');

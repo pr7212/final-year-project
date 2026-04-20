@@ -35,11 +35,9 @@ if ($role === 'admin' || $role === 'officer') {
 
   // Admin + Officer can see all reports
   $sql = "
-        SELECT r.id, r.user_id, r.status, r.created_at, a.name AS area_name, t.name AS truck_name
-        FROM requests r
-        LEFT JOIN areas a ON r.area_id = a.id
-        LEFT JOIN trucks t ON a.assigned_truck_id = t.id
-        ORDER BY r.created_at DESC
+        SELECT id, user_id, area, status, timestamp
+        FROM requests
+        ORDER BY timestamp DESC
     ";
 
   $stmt = $conn->prepare($sql);
@@ -47,12 +45,10 @@ if ($role === 'admin' || $role === 'officer') {
 
   // Collectors only see assigned jobs
   $sql = "
-        SELECT r.id, r.user_id, r.status, r.created_at, a.name AS area_name, t.name AS truck_name
-        FROM requests r
-        LEFT JOIN areas a ON r.area_id = a.id
-        LEFT JOIN trucks t ON a.assigned_truck_id = t.id
-        WHERE r.status = 'assigned'
-        ORDER BY r.created_at DESC
+        SELECT id, user_id, area, status, timestamp
+        FROM requests
+        WHERE status = 'assigned'
+        ORDER BY timestamp DESC
     ";
 
   $stmt = $conn->prepare($sql);
@@ -60,17 +56,14 @@ if ($role === 'admin' || $role === 'officer') {
 
   // Residents only see their own requests
   $sql = "
-        SELECT r.id, r.user_id, r.status, r.created_at, a.name AS area_name, t.name AS truck_name
-        FROM requests r
-        LEFT JOIN areas a ON r.area_id = a.id
-        LEFT JOIN trucks t ON a.assigned_truck_id = t.id
-        WHERE r.user_id = ?
-        ORDER BY r.created_at DESC
+        SELECT id, user_id, area, status, timestamp
+        FROM requests
+        WHERE user_id = ?
+        ORDER BY timestamp DESC
     ";
 
   $stmt = $conn->prepare($sql);
 } else {
-
   respond(false, 'Invalid user role', [], 403);
 }
 
@@ -114,10 +107,9 @@ while ($row = $result->fetch_assoc()) {
   $data[] = [
     'id'        => (int) $row['id'],
     'user_id'   => (int) $row['user_id'],
-    'area_name' => htmlspecialchars($row['area_name'] ?? 'Unknown'),
-    'truck_name' => htmlspecialchars($row['truck_name'] ?? 'No truck'),
+    'area'      => htmlspecialchars($row['area']),
     'status'    => htmlspecialchars($row['status']),
-    'created_at' => $row['created_at']
+    'timestamp' => $row['timestamp']
   ];
 }
 

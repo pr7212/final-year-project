@@ -18,8 +18,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   respond(false, 'Method not allowed', 405);
 }
 
-if (empty($_SESSION['role']) || !in_array($_SESSION['role'], ['admin', 'collector'], true)) {
-  respond(false, 'Access denied', 403);
+if (empty($_SESSION['user_id'])) {
+  respond(false, 'Unauthorized', 401);
 }
 
 if (
@@ -31,35 +31,42 @@ if (
 }
 
 $request_id = filter_input(INPUT_POST, 'request_id', FILTER_VALIDATE_INT);
-$status = trim($_POST['status'] ?? '');
-$allowed_statuses = ['pending', 'assigned', 'completed', 'cancelled'];
-
 if (!$request_id || $request_id <= 0) {
   respond(false, 'Invalid request_id', 400);
 }
 
-if (!in_array($status, $allowed_statuses, true)) {
-  respond(false, 'Invalid status value', 400);
+$user_id = (int) $_SESSION['user_id'];
+$isAdmin = ($_SESSION['role'] ?? 'user') === 'admin';
+
+if ($isAdmin) {
+  $stmt = $conn->prepare('DELETE FROM requests WHERE id = ?');
+} else {
+  $stmt = $conn->prepare('DELETE FROM requests WHERE id = ? AND user_id = ?');
 }
 
-$stmt = $conn->prepare('UPDATE requests SET status = ? WHERE id = ?');
 if (!$stmt) {
-  respond(false, 'Query preparation failed', 500);
+  respond(false, 'Database error', 500);
 }
 
-$stmt->bind_param('si', $status, $request_id);
+if ($isAdmin) {
+  $stmt->bind_param('i', $request_id);
+} else {
+  $stmt->bind_param('ii', $request_id, $user_id);
+}
 
 if (!$stmt->execute()) {
   $stmt->close();
   $conn->close();
-  respond(false, 'Update failed', 500);
+  respond(false, 'Delete failed', 500);
 }
 
-$message = $stmt->affected_rows > 0
-  ? 'Status updated successfully'
-  : 'No changes made or request not found';
+if ($stmt->affected_rows === 0) {
+  $stmt->close();
+  $conn->close();
+  respond(false, 'Request not found or access denied', 404);
+}
 
 $stmt->close();
 $conn->close();
 
-respond(true, $message);
+respond(true, 'Request deleted');

@@ -2,6 +2,8 @@
 session_start();
 require '../config/db.php';
 
+header('Content-Type: application/json');
+
 // 0. Redirect if already logged in
 if (!empty($_SESSION['user_id'])) {
   header("Location: ../index.php");
@@ -64,14 +66,17 @@ if (!hash_equals($password, $confirm)) {
 $stmt = $conn->prepare("SELECT id FROM users WHERE email = ? LIMIT 1");
 
 if (!$stmt) {
-  header("Location: ../register.php?error=db_error");
+  echo json_encode(["error" => $conn->error]);
+  $conn->close();
   exit();
 }
 
 $stmt->bind_param("s", $email);
 
 if (!$stmt->execute()) {
-  header("Location: ../register.php?error=db_error");
+  echo json_encode(["error" => $stmt->error]);
+  $stmt->close();
+  $conn->close();
   exit();
 }
 
@@ -93,7 +98,8 @@ $stmt = $conn->prepare(
 );
 
 if (!$stmt) {
-  header("Location: ../register.php?error=db_error");
+  echo json_encode(["error" => $conn->error]);
+  $conn->close();
   exit();
 }
 
@@ -101,12 +107,13 @@ $stmt->bind_param("ssss", $name, $email, $hashed_password, $role);
 
 // 12. Execute
 if ($stmt->execute()) {
+  $stmt->close();
+  $conn->close();
   header("Location: ../index.php?success=registered");
+  exit();
 } else {
-  header("Location: ../register.php?error=failed");
+  echo json_encode(["error" => $stmt->error]);
+  $stmt->close();
+  $conn->close();
+  exit();
 }
-
-// cleanup
-$stmt->close();
-$conn->close();
-exit();
