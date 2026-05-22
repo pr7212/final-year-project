@@ -16,7 +16,7 @@ $success = $_GET['success'] ?? '';
 $error = $_GET['error'] ?? '';
 
 include 'includes/header.php';
-include 'config/db.php';
+
 ?>
 <div class="container">
   <div id="feedback" style="display:none; padding:10px; margin:10px 0;"></div>
@@ -80,6 +80,7 @@ include 'config/db.php';
       <select id="edit-status">
         <option value="pending">Pending</option>
         <option value="assigned">Assigned</option>
+        <option value="in-progress">In Progress</option>
         <option value="completed">Completed</option>
         <option value="cancelled">Cancelled</option>
       </select>
@@ -89,5 +90,8 @@ include 'config/db.php';
   </div>
 </div>
 
+<script>
+  document.body.dataset.role = 'admin';
+</script>
 <script src="js/script.js"></script>
 <?php include 'includes/footer.php'; ?>

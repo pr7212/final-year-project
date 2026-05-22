@@ -67,18 +67,42 @@ if ($request_id <= 0 || $area_id <= 0 || empty($status)) {
 
 $user_id = (int) $_SESSION['user_id'];
 
-$sql = "
-  UPDATE requests
-  SET area_id = ?, status = ?, updated_at = CURRENT_TIMESTAMP
-  WHERE id = ? AND (user_id = ? OR ? IN ('admin', 'officer'))
-";
-$stmt = $conn->prepare($sql);
-if (!$stmt) {
-  respond(false, 'Database error', null, 500, '../resident.php?error=db_error');
+// Validate status against allowed values
+$allowed_statuses = ['pending', 'assigned', 'in-progress', 'completed', 'cancelled'];
+if (!in_array($status, $allowed_statuses, true)) {
+  respond(false, 'Invalid status value', null, 400, '../admin.php?error=invalid_status');
 }
 
-$admin_officer = ($role === 'admin' || $role === 'officer') ? 1 : 0;
-$stmt->bind_param('isis i', $area_id, $status, $request_id, $user_id, $admin_officer);
+if ($role === 'admin' || $role === 'officer') {
+  // Admins/officers can edit any request
+  $sql = "
+    UPDATE requests
+    SET area_id = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  ";
+  $stmt = $conn->prepare($sql);
+  if (!$stmt) {
+    respond(false, 'Database error', null, 500, '../admin.php?error=db_error');
+  }
+  $stmt->bind_param('isi', $area_id, $status, $request_id);
+} else {
+  // Residents can only edit their own pending requests
+  $resident_allowed_statuses = ['pending', 'cancelled'];
+  if (!in_array($status, $resident_allowed_statuses, true)) {
+    respond(false, 'Invalid status for resident', null, 403, '../resident.php?error=invalid_status');
+  }
+
+  $sql = "
+    UPDATE requests
+    SET area_id = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ? AND user_id = ? AND status = 'pending'
+  ";
+  $stmt = $conn->prepare($sql);
+  if (!$stmt) {
+    respond(false, 'Database error', null, 500, '../resident.php?error=db_error');
+  }
+  $stmt->bind_param('isii', $area_id, $status, $request_id, $user_id);
+}
 
 if (!$stmt->execute()) {
   $stmt->close();

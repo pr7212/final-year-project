@@ -19,6 +19,8 @@ function respond($success, $message, $data = [], $code = 200)
   exit();
 }
 
+requireRole(['admin', 'officer', 'resident']);
+
 if ($role === 'admin' || $role === 'officer') {
   // All reports
   $sql = "SELECT r.id, r.user_id, u.name as user_name, r.location, r.description, r.status, r.created_at
@@ -28,7 +30,7 @@ if ($role === 'admin' || $role === 'officer') {
   $stmt = $conn->prepare($sql);
 } elseif ($role === 'resident') {
   // Own reports
-  $sql = "SELECT id, location, description, status, created_at FROM reports WHERE user_id = ? ORDER BY created_at DESC";
+  $sql = "SELECT id, user_id, location, description, status, created_at FROM reports WHERE user_id = ? ORDER BY created_at DESC";
   $stmt = $conn->prepare($sql);
   $stmt->bind_param('i', $user_id);
 } else {
@@ -54,7 +56,7 @@ while ($row = $result->fetch_assoc()) {
   ];
 }
 
-respond(true, 'Reports fetched', $data);
-
 $stmt->close();
 $conn->close();
+
+respond(true, 'Reports fetched', $data);

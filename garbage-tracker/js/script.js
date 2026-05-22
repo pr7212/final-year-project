@@ -20,8 +20,8 @@ function showFeedback(message, success = false) {
   if (!feedbackDiv) return;
 
   feedbackDiv.textContent = message;
-  feedbackDiv.style.display = 'block';
-  feedbackDiv.style.color = success ? 'green' : 'red';
+  feedbackDiv.style.display = 'flex';
+  feedbackDiv.className = success ? 'alert alert-success' : 'alert alert-error';
 
   setTimeout(() => {
     feedbackDiv.style.display = 'none';
@@ -78,7 +78,7 @@ function renderRows(items) {
   tableBody.innerHTML = '';
 
   if (!items.length) {
-    tableBody.innerHTML = `<tr><td colspan="4">No requests found</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="5">No requests found</td></tr>`;
     return;
   }
 
@@ -89,7 +89,7 @@ function renderRows(items) {
     <td>${item.id}</td>
             <td>${item.area_name}</td>
             <td>${item.truck_name || 'No truck'}</td>
-            <td>${item.status}</td>
+            <td><span class="status-badge status-${item.status.toLowerCase()}">${item.status}</span></td>
             <td class="actions-cell"></td>
         `;
 
@@ -101,7 +101,7 @@ function renderRows(items) {
     if (userRole === 'resident') {
       if (item.status === 'pending') {
         const editBtn = createButton('Edit', () =>
-          editRow(item.id, item.area, item.status)
+          editRow(item.id, item.area_name, item.status)
         );
 
         const delBtn = createButton('Delete', () => deleteRow(item.id), 'red');
@@ -115,7 +115,7 @@ function renderRows(items) {
            ADMIN ACTIONS
         ========================== */
       const editBtn = createButton('Edit', () =>
-        editRow(item.id, item.area, item.status)
+        editRow(item.id, item.area_name, item.status)
       );
 
       const delBtn = createButton('Delete', () => deleteRow(item.id), 'red');
@@ -156,8 +156,11 @@ function createButton(text, callback, color = '') {
   btn.type = 'button';
   btn.textContent = text;
   btn.onclick = callback;
+  btn.className = 'btn gap-2';
 
-  if (color) {
+  if (color === 'red') {
+    btn.className = 'btn btn-danger gap-2';
+  } else if (color) {
     btn.style.background = color;
     btn.style.color = '#fff';
   }
@@ -219,9 +222,16 @@ async function editRow(id, areaName, status) {
   const result = await ajaxRequest('actions/fetch_areas.php');
   if (result.success) {
     populateSelect('edit-area_id', result.data, 'Select Area');
+    // Find the matching area by name and set it
+    const matchingArea = result.data.find(a => a.name === areaName);
+    if (matchingArea) document.getElementById('edit-area_id').value = matchingArea.id;
   }
 
-  editModal.style.display = 'block';
+  if (editModal.tagName === 'DIALOG') {
+    editModal.showModal();
+  } else {
+    editModal.style.display = 'block';
+  }
 }
 
 async function saveEdit() {
@@ -302,7 +312,11 @@ async function markCollected(id) {
 ===================================== */
 function closeModal() {
   if (editModal) {
-    editModal.style.display = 'none';
+    if (editModal.tagName === 'DIALOG') {
+      editModal.close();
+    } else {
+      editModal.style.display = 'none';
+    }
   }
 }
 
@@ -334,13 +348,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  if (createForm && userRole === 'resident') {
+  if (createForm && (userRole === 'resident' || userRole === 'admin')) {
     createForm.addEventListener('submit', createRequest);
   }
 
   const refreshBtn = document.getElementById('load-table');
   if (refreshBtn) {
     refreshBtn.addEventListener('click', loadTable);
+  }
+
+  const themeToggle = document.getElementById('theme-toggle');
+  if (themeToggle) {
+    themeToggle.addEventListener('click', () => {
+      const currentTheme = document.documentElement.getAttribute('data-theme');
+      const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', newTheme);
+      localStorage.setItem('theme', newTheme);
+    });
   }
 
   loadTable();

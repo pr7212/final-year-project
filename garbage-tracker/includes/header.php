@@ -3,14 +3,16 @@ if (session_status() === PHP_SESSION_NONE) {
   session_start();
 }
 
+header("X-Frame-Options: DENY");
+header("X-Content-Type-Options: nosniff");
+if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+  header("Strict-Transport-Security: max-age=31536000; includeSubDomains");
+}
+header("Content-Security-Policy: default-src 'self'; font-src 'self' https://fonts.gstatic.com; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; script-src 'self' 'unsafe-inline'");
+
 $fullPageTitle = isset($pageTitle)
   ? htmlspecialchars($pageTitle) . ' | Garbage Tracker'
   : 'Garbage Tracker';
-
-$logoutUrl = 'actions/logout.php';
-if (!empty($_SESSION['csrf_token'])) {
-  $logoutUrl .= '?csrf_token=' . urlencode($_SESSION['csrf_token']);
-}
 
 function getDashboardUrl()
 {
@@ -31,17 +33,29 @@ function getDashboardUrl()
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?= $fullPageTitle ?></title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
+  <script>
+    const theme = localStorage.getItem('theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', theme);
+  </script>
 </head>
 
 <body>
   <nav>
     <span><strong>Garbage Tracker</strong></span>
     <span>
+      <button id="theme-toggle" class="btn" style="padding: 0.4rem 0.8rem; margin-right: 15px; background: transparent; border: 1px solid var(--surface-border); color: var(--text-main); box-shadow: none;">🌓</button>
       <?php if (isset($_SESSION['user_id'])): ?>
         Welcome, <?= htmlspecialchars($_SESSION['user_name'] ?? 'User') ?>
         | <a href="<?= getDashboardUrl() ?>">Dashboard</a>
-        | <a href="<?= htmlspecialchars($logoutUrl) ?>">Logout</a>
+        |
+        <form id="logout-form" action="actions/logout.php" method="POST" style="display:inline; margin:0; padding:0;">
+          <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
+          <button type="submit" style="background:none;border:none;color:blue;text-decoration:underline;cursor:pointer;padding:0;">Logout</button>
+        </form>
       <?php else: ?>
         <a href="index.php">Login</a> |
         <a href="register.php">Register</a>

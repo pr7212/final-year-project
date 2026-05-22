@@ -1,5 +1,5 @@
 <?php
-session_start();
+require_once '../includes/auth.php';
 require '../config/db.php';
 
 header('Content-Type: application/json');
@@ -15,9 +15,7 @@ function respond($success, $message, $data = [])
   exit();
 }
 
-if (empty($_SESSION['user_id'])) {
-  respond(false, 'Unauthorized');
-}
+requireRole(['admin', 'officer', 'resident', 'collector']);
 
 $stmt = $conn->prepare('SELECT id, name FROM areas ORDER BY name');
 if (!$stmt) {

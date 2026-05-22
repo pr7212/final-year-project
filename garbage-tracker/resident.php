@@ -16,11 +16,11 @@ include 'includes/header.php';
   <div id="feedback" style="display:none; padding:10px; margin:10px 0;"></div>
 
   <?php if ($success === 'request_submitted'): ?>
-    <div style="display:block; color:green; background:#fff; padding:10px; margin:10px 0;">
+    <div class="alert alert-success">
       Request submitted successfully.
     </div>
   <?php elseif ($error !== ''): ?>
-    <div style="display:block; color:red; background:#fff; padding:10px; margin:10px 0;">
+    <div class="alert alert-error">
       <?= htmlspecialchars(str_replace('_', ' ', $error)) ?>
     </div>
   <?php endif; ?>
@@ -34,9 +34,9 @@ include 'includes/header.php';
   <h3>📈 Submit Report/Complaint</h3>
   <form id="report-form">
     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
-    <input type="text" id="report-location" name="location" placeholder="Problem Location (e.g. Street corner)" required style="width:100%; padding:10px; margin:5px 0;">
-    <textarea id="report-description" name="description" placeholder="Describe the issue (overflowing bins, bad smell, etc.)" required style="width:100%; padding:10px; height:100px; margin:5px 0;"></textarea>
-    <button type="submit" style="padding:10px 20px; background:#F44336; color:white; border:none;">Submit Report</button>
+    <input type="text" id="report-location" name="location" placeholder="Problem Location (e.g. Street corner)" required>
+    <textarea id="report-description" name="description" placeholder="Describe the issue (overflowing bins, bad smell, etc.)" required></textarea>
+    <button type="submit" class="btn">Submit Report</button>
   </form>
 
   <h3>🚚 Create Garbage Pickup Request</h3>
@@ -48,12 +48,33 @@ include 'includes/header.php';
     <button type="submit">Submit Pickup Request</button>
   </form>
 
-  <button id="load-table" type="button" style="margin:10px 0;">Refresh My Requests</button>
+
+  <div style="margin:20px 0;">
+    <h3>📅 Collection Schedule</h3>
+    <button id="load-schedules" type="button" class="btn mt-4 mb-4">Refresh Schedule</button>
+    <div class="table-responsive">
+      <table id="schedules-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Location</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td colspan="3">Loading...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
 
   <div style="margin:20px 0;">
     <h3>📋 My Pickup Requests</h3>
-    <button id="load-requests" type="button" style="margin:10px 0;">Refresh Requests</button>
-    <table id="requests-table" border="1" style="width:100%;">
+    <button id="load-table" type="button" class="btn mt-4 mb-4">Refresh Requests</button>
+    <div class="table-responsive">
+      <table id="requests-table">
       <thead>
         <tr>
           <th>ID</th>
@@ -69,12 +90,14 @@ include 'includes/header.php';
         </tr>
       </tbody>
     </table>
+    </div>
   </div>
 
   <div style="margin:20px 0;">
     <h3>📊 My Reports</h3>
-    <button id="load-reports" type="button" style="margin:10px 0;">Refresh Reports</button>
-    <table id="reports-table" border="1" style="width:100%;">
+    <button id="load-reports" type="button" class="btn mt-4 mb-4">Refresh Reports</button>
+    <div class="table-responsive">
+      <table id="reports-table">
       <thead>
         <tr>
           <th>ID</th>
@@ -90,25 +113,10 @@ include 'includes/header.php';
         </tr>
       </tbody>
     </table>
+    </div>
   </div>
-  <table id="requests-table" border="1" style="width:100%;">
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>Area</th>
-        <th>Truck</th>
-        <th>Status</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td colspan="4">Loading...</td>
-      </tr>
-    </tbody>
-  </table>
 
-  <div id="edit-modal" style="display:none; position:fixed; top:20%; left:20%; background:white; border:2px solid #ccc; padding:20px; z-index:1000;">
+  <dialog id="edit-modal">
     <h4>Edit Request</h4>
     <input type="hidden" id="edit-id">
     <label>Area: <select id="edit-area_id" required>
@@ -117,15 +125,12 @@ include 'includes/header.php';
     <label>Status:
       <select id="edit-status">
         <option value="pending">Pending</option>
-        <option value="assigned">Assigned</option>
-        <option value="in-progress">In Progress</option>
-        <option value="completed">Completed</option>
         <option value="cancelled">Cancelled</option>
       </select>
     </label><br><br>
-    <button type="button" onclick="saveEdit()">Save</button>
-    <button type="button" onclick="closeModal()">Cancel</button>
-  </div>
+    <button type="button" class="btn" onclick="saveEdit()">Save</button>
+    <button type="button" class="btn btn-danger" onclick="closeModal()">Cancel</button>
+  </dialog>
 </div>
 
 <script>
@@ -165,7 +170,7 @@ include 'includes/header.php';
             <tr>
               <td>${row.id}</td>
               <td>${row.location}</td>
-              <td><span style="color:${row.status === 'resolved' ? 'green' : 'orange'}">${row.status}</span></td>
+              <td><span class="status-badge status-${row.status.toLowerCase()}">${row.status}</span></td>
               <td>${row.description.substring(0,50)}${row.description.length>50?'...':''}</td>
               <td>${new Date(row.created_at).toLocaleString()}</td>
             </tr>
@@ -179,7 +184,34 @@ include 'includes/header.php';
     }
   }
 
-  document.getElementById('load-reports')?.onclick = loadReports;
+  document.getElementById('load-reports')?.addEventListener('click', loadReports);
+
+  async function loadSchedules() {
+    try {
+      const res = await fetch('actions/fetch_schedules.php');
+      const data = await res.json();
+      const tbody = document.querySelector('#schedules-table tbody');
+      tbody.innerHTML = '';
+      if (data.success && data.data.length) {
+        data.data.forEach(row => {
+          tbody.innerHTML += `
+            <tr>
+              <td>${row.collection_date}</td>
+              <td>${row.location}</td>
+              <td><span class="status-badge status-${row.status.toLowerCase()}">${row.status}</span></td>
+            </tr>
+          `;
+        });
+      } else {
+        tbody.innerHTML = '<tr><td colspan="3">No schedules found</td></tr>';
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  document.getElementById('load-schedules')?.addEventListener('click', loadSchedules);
+  loadSchedules();
 </script>
 <script src="js/script.js"></script>
 <?php include 'includes/footer.php'; ?>

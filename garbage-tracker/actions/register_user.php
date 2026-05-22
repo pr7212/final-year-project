@@ -2,7 +2,6 @@
 session_start();
 require '../config/db.php';
 
-header('Content-Type: application/json');
 
 // 0. Redirect if already logged in
 if (!empty($_SESSION['user_id'])) {
@@ -57,7 +56,7 @@ if (strlen($password) < 8) {
 }
 
 // 8. Secure password match check
-if (!hash_equals($password, $confirm)) {
+if ($password !== $confirm) {
   header("Location: ../register.php?error=password_mismatch");
   exit();
 }
@@ -66,7 +65,8 @@ if (!hash_equals($password, $confirm)) {
 $stmt = $conn->prepare("SELECT id FROM users WHERE email = ? LIMIT 1");
 
 if (!$stmt) {
-  echo json_encode(["error" => $conn->error]);
+  error_log('register_user.php: prepare failed - ' . $conn->error);
+  header("Location: ../register.php?error=db_error");
   $conn->close();
   exit();
 }
@@ -74,7 +74,8 @@ if (!$stmt) {
 $stmt->bind_param("s", $email);
 
 if (!$stmt->execute()) {
-  echo json_encode(["error" => $stmt->error]);
+  error_log('register_user.php: execute failed - ' . $stmt->error);
+  header("Location: ../register.php?error=db_error");
   $stmt->close();
   $conn->close();
   exit();
@@ -98,7 +99,8 @@ $stmt = $conn->prepare(
 );
 
 if (!$stmt) {
-  echo json_encode(["error" => $conn->error]);
+  error_log('register_user.php: insert prepare failed - ' . $conn->error);
+  header("Location: ../register.php?error=db_error");
   $conn->close();
   exit();
 }
@@ -112,7 +114,8 @@ if ($stmt->execute()) {
   header("Location: ../index.php?success=registered");
   exit();
 } else {
-  echo json_encode(["error" => $stmt->error]);
+  error_log('register_user.php: insert failed - ' . $stmt->error);
+  header("Location: ../register.php?error=failed");
   $stmt->close();
   $conn->close();
   exit();
